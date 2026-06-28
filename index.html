@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1565C0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>MPM Pendientes</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css?v=9">
+</head>
+<body>
+
+<!-- ── Loading overlay ── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast" class="toast"></div>
+
+<!-- ── Modal: Bitácora de resolución ── -->
+<div id="modal-bitacora" class="modal-overlay">
+  <div class="modal-card">
+    <h3 class="modal-title">¿Qué se hizo?</h3>
+    <p class="modal-subtitle">
+      Describe la acción tomada para resolver este pendiente.
+      Quedará registrado y visible para el gerente.
+    </p>
+    <textarea id="bitacora-texto" class="form-textarea" rows="4"
+      placeholder="Ej: Se reemplazó el rodamiento 6205 2RS del eje principal. Se alineó y se verificó temperatura en marcha. Máquina operando normal."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeBitacoraModal()">Cancelar</button>
+      <button class="btn btn-success" onclick="submitBitacora()">Guardar y cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<!-- VIEW: LOGIN                                                          -->
+<!-- =================================================================== -->
+<div id="view-login" class="view active">
+  <div class="login-container">
+    <div class="login-logo">
+      <img src="icon.svg" alt="MPM" width="72" height="72">
+    </div>
+    <h1 class="login-title">MPM Pendientes</h1>
+    <p class="login-subtitle">Titan Empaques<br>Mega Planta Mexicali</p>
+
+    <div class="form-group">
+      <label class="form-label">Tu nombre</label>
+      <select id="login-nombre" class="form-select">
+        <option value="">— Selecciona tu nombre —</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Contraseña</label>
+      <input type="password" id="login-password" class="form-input"
+        placeholder="Contraseña"
+        onkeydown="if(event.key==='Enter') handleLogin()">
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="handleLogin()">Entrar</button>
+
+    <p class="login-footer">
+      Mantenimiento es el activo silencioso que protege la rentabilidad.
+    </p>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<!-- VIEW: DASHBOARD                                                      -->
+<!-- =================================================================== -->
+<div id="view-dashboard" class="view">
+  <header class="app-header">
+    <div class="header-left">
+      <span class="header-greeting">Hola, <strong id="dash-nombre">—</strong></span>
+      <span class="header-rol" id="dash-rol"></span>
+    </div>
+    <button class="btn-icon" onclick="loadAndShowDashboard()" title="Actualizar datos">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
+    <button class="btn-icon" onclick="handleLogout()" title="Cerrar sesión">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+    </button>
+  </header>
+
+  <main class="view-content">
+    <!-- Propuestas alert (gerente only) -->
+    <div id="dash-propuestas-section" class="alert-banner" hidden>
+      <span>⚠️ <strong id="badge-propuestas">0</strong> propuesta(s) esperan tu aprobación</span>
+      <button class="btn btn-sm"
+        onclick="openLista('propuestas')"
+        style="background:#F59E0B;color:#fff;flex-shrink:0;margin-left:auto;">Ver</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card stat-pendiente" onclick="openLista('pendiente')">
+        <span class="stat-num" id="count-pendiente">—</span>
+        <span class="stat-label">Pendiente</span>
+      </div>
+      <div class="stat-card stat-proceso" onclick="openLista('en_proceso')">
+        <span class="stat-num" id="count-en-proceso">—</span>
+        <span class="stat-label">En Proceso</span>
+      </div>
+      <div class="stat-card stat-resuelto" onclick="openLista('resuelto')">
+        <span class="stat-num" id="count-resuelto">—</span>
+        <span class="stat-label">Resueltos</span>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="actions-row">
+      <button class="btn btn-outline" onclick="openLista('todos')">📋 Ver todo</button>
+      <button class="btn btn-primary" onclick="openNuevo()">+ Nuevo</button>
+    </div>
+
+    <!-- Gerente: filtros por supervisor -->
+    <div id="dash-gerente-section" hidden>
+      <div class="section-title">Ver por supervisor</div>
+      <div class="supervisor-chips">
+        <button class="btn btn-ghost btn-sm" onclick="openListaPersona('Daniel Cervantes')">Daniel</button>
+        <button class="btn btn-ghost btn-sm" onclick="openListaPersona('Efrain Ruiz')">Efrain</button>
+        <button class="btn btn-ghost btn-sm" onclick="openListaPersona('Jesus Ley')">Jesus</button>
+        <button class="btn btn-ghost btn-sm" onclick="openListaPersona('Arol Lopez')">Arol</button>
+        <button class="btn btn-ghost btn-sm" onclick="openListaPersona('Ramon Alarcon')">Ramon</button>
+        <button class="btn btn-ghost btn-sm" onclick="openListaPersona('Nohemi Hernández')">Nohemi</button>
+      </div>
+    </div>
+
+    <!-- Recent -->
+    <div class="section-title">Activos recientes</div>
+    <div id="dash-recent"></div>
+  </main>
+</div>
+
+<!-- =================================================================== -->
+<!-- VIEW: LISTA                                                          -->
+<!-- =================================================================== -->
+<div id="view-lista" class="view">
+  <header class="app-header">
+    <button class="btn-icon" onclick="showView('view-dashboard')" aria-label="Atrás">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <h2 class="header-title" id="lista-title">Pendientes</h2>
+    <button class="btn-icon" onclick="openNuevo()" title="Nuevo pendiente">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Filter pills -->
+  <div class="filter-bar">
+    <div class="filter-pills">
+      <button class="filter-pill active" data-filtro="todos"      onclick="setFiltro('todos')">Todos</button>
+      <button class="filter-pill"        data-filtro="pendiente"  onclick="setFiltro('pendiente')">Pendiente</button>
+      <button class="filter-pill"        data-filtro="en_proceso" onclick="setFiltro('en_proceso')">En Proceso</button>
+      <button class="filter-pill"        data-filtro="resuelto"   onclick="setFiltro('resuelto')">Resueltos</button>
+      <button class="filter-pill"        data-filtro="propuestas" onclick="setFiltro('propuestas')">Propuestas</button>
+    </div>
+    <!-- Persona filter (gerente only) -->
+    <div id="persona-filter" class="persona-filter" hidden>
+      <select id="persona-select" class="form-select form-select-sm"
+        onchange="setFiltroPersona(this.value)">
+        <option value="">— Todas las personas —</option>
+        <option value="Daniel Cervantes">Daniel Cervantes</option>
+        <option value="Efrain Ruiz">Efrain Ruiz</option>
+        <option value="Jesus Ley">Jesus Ley</option>
+        <option value="Arol Lopez">Arol Lopez</option>
+        <option value="Ramon Alarcon">Ramon Alarcon</option>
+        <option value="Nohemi Hernández">Nohemi Hernández</option>
+      </select>
+    </div>
+  </div>
+
+  <main class="view-content">
+    <div id="lista-items"></div>
+  </main>
+</div>
+
+<!-- =================================================================== -->
+<!-- VIEW: DETALLE                                                        -->
+<!-- =================================================================== -->
+<div id="view-detalle" class="view">
+  <header class="app-header">
+    <button class="btn-icon" onclick="goBackFromDetalle()" aria-label="Atrás">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <h2 class="header-title">Detalle del pendiente</h2>
+    <div style="width:40px"></div>
+  </header>
+
+  <main class="view-content">
+    <!-- Info fields -->
+    <div class="detail-card">
+      <div class="detail-row">
+        <span class="detail-label">Máquina</span>
+        <span class="detail-value" id="det-maquina"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Sección</span>
+        <span class="detail-value" id="det-seccion"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Estado</span>
+        <span class="detail-value" id="det-estado"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Tipo</span>
+        <span class="detail-value" id="det-origen"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Asignado a</span>
+        <span class="detail-value" id="det-asignado-a"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Creado por</span>
+        <span class="detail-value" id="det-creado-por"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Aprobado por</span>
+        <span class="detail-value" id="det-aprobado-por"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Creación</span>
+        <span class="detail-value" id="det-fecha-creacion"></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Resolución</span>
+        <span class="detail-value" id="det-fecha-resolucion"></span>
+      </div>
+    </div>
+
+    <!-- Descripción -->
+    <div class="descripcion-card">
+      <span class="detail-label">Descripción</span>
+      <p id="det-descripcion" class="descripcion-text"></p>
+    </div>
+
+    <!-- Bitácora (visible cuando está resuelto) -->
+    <div id="det-bitacora-section" class="bitacora-card" hidden>
+      <span class="detail-label">📋 Bitácora de resolución</span>
+      <p id="det-bitacora" class="bitacora-text"></p>
+    </div>
+
+    <!-- Action buttons (rendered by JS) -->
+    <div id="det-actions" class="actions-section"></div>
+  </main>
+</div>
+
+<!-- =================================================================== -->
+<!-- VIEW: NUEVO PENDIENTE                                                -->
+<!-- =================================================================== -->
+<div id="view-nuevo" class="view">
+  <header class="app-header">
+    <button class="btn-icon" onclick="showView('view-dashboard')" aria-label="Atrás">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <h2 class="header-title">Nuevo Pendiente</h2>
+    <div style="width:40px"></div>
+  </header>
+
+  <main class="view-content">
+    <div class="form-card">
+      <div class="form-group">
+        <label class="form-label">Tipo de pendiente</label>
+        <select id="nuevo-origen" class="form-select" onchange="updateAsignadoField()"></select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Máquina / Equipo *</label>
+        <select id="nuevo-maquina" class="form-select"
+          onchange="handleCatalogoChange('nuevo-maquina', 'maquina')"></select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Sección / Módulo *</label>
+        <select id="nuevo-seccion" class="form-select"
+          onchange="handleCatalogoChange('nuevo-seccion', 'seccion')"></select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Descripción *</label>
+        <textarea id="nuevo-descripcion" class="form-textarea" rows="4"
+          placeholder="Describe qué hay que hacer, síntomas observados, urgencia..."></textarea>
+      </div>
+
+      <div id="nuevo-asignado-section" class="form-group" hidden>
+        <label class="form-label">Asignar a</label>
+        <select id="nuevo-asignado" class="form-select"></select>
+      </div>
+
+      <button class="btn btn-primary btn-full" onclick="submitNuevo()" style="margin-top:8px">
+        Guardar pendiente
+      </button>
+    </div>
+  </main>
+</div>
+
+<script src="app.js?v=9"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="38" fill="#1565C0"/>
+  <text x="96" y="88" text-anchor="middle" fill="white"
+    font-family="Arial Black, Arial, sans-serif" font-size="46" font-weight="900">MPM</text>
+  <text x="96" y="120" text-anchor="middle" fill="rgba(255,255,255,0.75)"
+    font-family="Arial, sans-serif" font-size="20" font-weight="600" letter-spacing="1">Pendientes</text>
+  <rect x="44" y="134" width="104" height="3" rx="1.5" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="96" cy="152" r="8" fill="rgba(255,255,255,0.15)"/>
+  <circle cx="96" cy="152" r="4" fill="rgba(255,255,255,0.5)"/>
+</svg>
