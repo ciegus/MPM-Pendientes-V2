@@ -1,6 +1,6 @@
 {
   "name": "MPM Pendientes",
-  "short_name": "MPM",
+  "short_name": "mpm2",
   "description": "Gestión de pendientes de mantenimiento — Titan Empaques Mexicali",
   "start_url": "./index.html",
   "scope": "./",
