@@ -130,50 +130,50 @@
       </button>
     </div>
     <div class="sbody">
-      <form id="pform" autocomplete="off">
-        <div class="fg" id="fg-origen">
-          <label>Tipo de pendiente</label>
-          <select id="f-origen" onchange="onOrigenChange()"></select>
+      <div id="fg-origen" class="fg">
+        <label>Tipo de pendiente</label>
+        <select id="f-origen" onchange="onOrigenChange()"></select>
+      </div>
+      <div class="fg">
+        <label>Equipo / Máquina *</label>
+        <input type="text" id="f-equipo" list="eq-datalist"
+          placeholder="Ej: BHS, BOBST 924, Compresor…" oninput="updateSecDatalist()">
+        <datalist id="eq-datalist"></datalist>
+      </div>
+      <div class="fg">
+        <label>Sección / Módulo</label>
+        <input type="text" id="f-seccion" list="sec-datalist"
+          placeholder="Ej: RSM, Eléctrico, Hidráulico…">
+        <datalist id="sec-datalist"></datalist>
+      </div>
+      <div class="fg">
+        <label>Descripción *</label>
+        <textarea id="f-descripcion" rows="3" placeholder="Describe el pendiente de mantenimiento..."></textarea>
+      </div>
+      <div class="fg">
+        <label>Prioridad</label>
+        <div class="selrow">
+          <div class="sopt" data-f="prio" data-v="alta">⛔ Alta</div>
+          <div class="sopt on" data-f="prio" data-v="normal">⚠️ Normal</div>
+          <div class="sopt" data-f="prio" data-v="baja">✅ Baja</div>
         </div>
-        <div class="fg">
-          <label>Equipo / Máquina *</label>
-          <input type="text" id="f-equipo" list="eq-datalist"
-            placeholder="Ej: BHS, BOBST 924, Compresor…" oninput="updateSecDatalist()">
-          <datalist id="eq-datalist"></datalist>
-        </div>
-        <div class="fg">
-          <label>Sección / Módulo</label>
-          <input type="text" id="f-seccion" list="sec-datalist"
-            placeholder="Ej: RSM, Eléctrico, Hidráulico…">
-          <datalist id="sec-datalist"></datalist>
-        </div>
-        <div class="fg">
-          <label>Descripción *</label>
-          <textarea id="f-descripcion" rows="3" placeholder="Describe el pendiente de mantenimiento..."></textarea>
-        </div>
-        <div class="fg">
-          <label>Prioridad</label>
-          <div class="selrow" id="sel-prio">
-            <div class="sopt" data-f="prio" data-v="alta">⛔ Alta</div>
-            <div class="sopt on" data-f="prio" data-v="normal">⚠️ Normal</div>
-            <div class="sopt" data-f="prio" data-v="baja">✅ Baja</div>
-          </div>
-        </div>
-        <div class="fg">
-          <label>Fecha Límite</label>
-          <input type="date" id="f-fechaLimite">
-        </div>
-        <div class="fg" id="fg-responsable">
-          <label>Asignar a</label>
-          <select id="f-responsable"></select>
-        </div>
-        <div class="fg">
-          <label>Notas</label>
-          <textarea id="f-notas" rows="2" placeholder="Observaciones, materiales, referencias..."></textarea>
-        </div>
-        <button type="button" class="btn btn-p" style="width:100%" onclick="submitForm()">Guardar</button>
-        <button type="button" class="btn btn-s" id="form-cancel" style="width:100%;margin-top:8px">Cancelar</button>
-      </form>
+      </div>
+      <div class="fg">
+        <label>Fecha Límite</label>
+        <input type="date" id="f-fechaLimite">
+      </div>
+      <div class="fg" id="fg-responsable">
+        <label>Asignar a</label>
+        <select id="f-responsable"></select>
+      </div>
+      <div class="fg">
+        <label>Notas</label>
+        <textarea id="f-notas" rows="2" placeholder="Observaciones, materiales, referencias..."></textarea>
+      </div>
+    </div>
+    <div class="sfoot">
+      <button type="button" class="btn btn-p" style="width:100%" onclick="submitForm()">Guardar</button>
+      <button type="button" class="btn btn-s" id="form-cancel" style="width:100%;margin-top:8px">Cancelar</button>
     </div>
   </div>
 </div>
