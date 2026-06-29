@@ -248,7 +248,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.4}
 .cm-confirm:active,.cm-skip:active{opacity:.8}
 
 /* ── TOAST ── */
-#toast{position:fixed;bottom:calc(78px + var(--sab));left:50%;transform:translateX(-50%) translateY(12px);background:var(--navy2);color:var(--text);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;box-shadow:var(--shadow);opacity:0;transition:all .25s ease;pointer-events:none;white-space:nowrap;z-index:999;max-width:90vw}
+#toast{position:fixed;top:calc(16px + var(--sat));left:50%;transform:translateX(-50%) translateY(-12px);background:var(--navy2);color:var(--text);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;box-shadow:var(--shadow);opacity:0;transition:all .25s ease;pointer-events:none;white-space:nowrap;z-index:999;max-width:90vw}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.toast-success{background:rgba(63,185,80,.15);border:1px solid #3FB950;color:#3FB950}
 #toast.toast-error{background:rgba(230,57,70,.15);border:1px solid #E63946;color:#E63946}
