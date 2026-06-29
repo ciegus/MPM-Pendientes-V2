@@ -621,32 +621,31 @@ document.getElementById('form-bg').addEventListener('click', closeForm);
 document.getElementById('form-close').addEventListener('click', closeForm);
 document.getElementById('form-cancel').addEventListener('click', closeForm);
 
-document.getElementById('pform').addEventListener('submit', async e => {
-  e.preventDefault();
+async function submitForm() {
   const equipo      = document.getElementById('f-equipo').value.trim();
   const descripcion = document.getElementById('f-descripcion').value.trim();
   if (!equipo)      { toast('El equipo es requerido',      'error'); return; }
   if (!descripcion) { toast('La descripción es requerida', 'error'); return; }
 
-  const payload = {
-    equipo,
-    seccion:     document.getElementById('f-seccion').value.trim(),
-    descripcion,
-    prioridad:   getOpt('prio') || 'normal',
-    fechaLimite: document.getElementById('f-fechaLimite').value,
-    notas:       document.getElementById('f-notas').value.trim(),
-    responsable: document.getElementById('f-responsable').value || '',
-    creadoPor:   S.user.nombre,
-  };
-
-  if (S.editId) {
-    payload.id = S.editId;
-  } else {
-    payload.origen = document.getElementById('f-origen').value;
-  }
-
   showLoading(true);
   try {
+    const payload = {
+      equipo,
+      seccion:     document.getElementById('f-seccion').value.trim(),
+      descripcion,
+      prioridad:   getOpt('prio') || 'normal',
+      fechaLimite: document.getElementById('f-fechaLimite').value,
+      notas:       document.getElementById('f-notas').value.trim(),
+      responsable: (document.getElementById('f-responsable').value || '').trim(),
+      creadoPor:   S.user.nombre,
+    };
+
+    if (S.editId) {
+      payload.id = S.editId;
+    } else {
+      payload.origen = document.getElementById('f-origen').value || 'personal';
+    }
+
     const r = await api('savePendiente', payload);
     if (r.success) {
       const wasEdit = !!S.editId;
@@ -658,12 +657,12 @@ document.getElementById('pform').addEventListener('submit', async e => {
     } else {
       toast(r.error || 'Error al guardar', 'error');
     }
-  } catch (_) {
-    toast('Error de conexión', 'error');
+  } catch (err) {
+    toast('Error: ' + (err.message || 'desconocido'), 'error');
   } finally {
     showLoading(false);
   }
-});
+}
 
 // ── Settings (Mi cuenta) ──────────────────────────────────────
 

@@ -1,4 +1,4 @@
-const CACHE = 'mpm-v12';
+const CACHE = 'mpm-v13';
 const ASSETS = [
   './index.html',
   './styles.css?v=12',
