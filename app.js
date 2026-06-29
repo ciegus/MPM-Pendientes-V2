@@ -48,13 +48,14 @@ function esc(s) {
 }
 
 function overdue(fl, st) {
-  return fl && st !== 'cerrado' && new Date(fl + 'T00:00:00') < new Date(new Date().toDateString());
+  if (!fl || st === 'cerrado') return false;
+  return new Date(String(fl).slice(0, 10) + 'T00:00:00') < new Date(new Date().toDateString());
 }
 
 function daysLabel(fl, st) {
   if (!fl || st === 'cerrado') return null;
   const now  = new Date(new Date().toDateString());
-  const d    = new Date(fl + 'T00:00:00');
+  const d    = new Date(String(fl).slice(0, 10) + 'T00:00:00');
   const diff = Math.round((d - now) / 86400000);
   if (diff === 0)  return { text: 'Hoy',                        cls: 'warn' };
   if (diff === 1)  return { text: 'Mañana',                     cls: 'warn' };
