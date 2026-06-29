@@ -1,670 +1,744 @@
-// ============================================================
-// MPM Pendientes — app.js
+// ================================================================
+// MPM Pendientes V2 — App Logic
 // Titan Empaques Mega Planta Mexicali
-//
-// PASO 1: Despliega apps-script/Code.gs como Web App en
-//         script.google.com, luego pega la URL aquí:
-// ============================================================
+// ================================================================
 
-const Config = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbyM1OOQ9eHZgfdugEBSkmeoQhOwPE0vQehsZvmNaNan33Fs6SPnAPRTBBFBI0eDB2qi/exec'
+const CONFIG = {
+  API_URL: 'https://script.google.com/macros/s/AKfycbyM1OOQ9eHZgfdugEBSkmeoQhOwPE0vQehsZvmNaNan33Fs6SPnAPRTBBFBI0eDB2qi/exec',
+  USUARIOS: [
+    'Luis Manuel Lima Díaz', 'Daniel Cervantes', 'Efrain Ruiz',
+    'Jesus Ley', 'Arol Lopez', 'Ramon Alarcon', 'Nohemi Hernández'
+  ],
+  SUPERVISORES: [
+    'Daniel Cervantes', 'Efrain Ruiz', 'Jesus Ley',
+    'Arol Lopez', 'Ramon Alarcon', 'Nohemi Hernández'
+  ]
 };
 
-// ── Estado global ──────────────────────────────────────────
-const State = {
-  user:                 null,   // {id, nombre, rol}
-  pendientes:           [],
+let S = {
+  user:                null,
+  pendientes:          [],
   propuestasPendientes: 0,
-  catalogo:             { maquinas: [], secciones: [] },
-  filtro:               'todos',
-  filtroPersona:        '',
-  prevView:             'view-dashboard',
-  pendienteActual:      null,
+  fSt:                 'todos',
+  search:              '',
+  prevView:            'view-dashboard',
+  detId:               null,
+  editId:              null,
 };
 
-const SUPERVISORES = [
-  'Daniel Cervantes', 'Efrain Ruiz', 'Jesus Ley',
-  'Arol Lopez', 'Ramon Alarcon', 'Nohemi Hernández',
-];
+// ── Utilidades ────────────────────────────────────────────────
 
-// ── API ────────────────────────────────────────────────────
-async function api(action, params = {}) {
-  const res = await fetch(Config.API_URL, {
-    method: 'POST',
-    body: JSON.stringify({ action, ...params }),
-    redirect: 'follow',
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+function today() {
+  return new Date().toISOString().slice(0, 10);
 }
 
-// ── Utilidades ─────────────────────────────────────────────
-function formatFecha(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+function fmtDate(d) {
+  if (!d) return '—';
+  const s = String(d).slice(0, 10);
+  const [y, m, day] = s.split('-');
+  return `${day}/${m}/${y}`;
 }
 
-function estadoLabel(e) {
-  const m = { pendiente: 'Pendiente', en_proceso: 'En Proceso', resuelto: 'Resuelto', rechazado: 'Rechazada' };
-  return m[e] || e;
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
-function origenLabel(o) {
-  const m = { personal: 'Personal', propuesta: 'Propuesta', asignado: 'Asignado' };
-  return m[o] || o;
-}
-
-function showToast(msg, type = 'info') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = `toast-${type} show`;
-  setTimeout(() => t.classList.remove('show'), 3200);
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
 }
 
 function showLoading(show) {
   document.getElementById('loading-overlay').classList.toggle('visible', show);
 }
 
-function esc(s) {
-  if (s == null) return '';
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast' + (type ? ' toast-' + type : '');
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2800);
 }
 
-// ── Navegación ─────────────────────────────────────────────
-function showView(id) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  const view = document.getElementById(id);
-  if (view) {
-    view.classList.add('active');
-    // Scroll content area to top
-    const content = view.querySelector('.view-content');
-    if (content) content.scrollTop = 0;
+async function api(action, params) {
+  const r = await fetch(CONFIG.API_URL, {
+    method: 'POST',
+    body: JSON.stringify(Object.assign({ action }, params || {})),
+  });
+  return r.json();
+}
+
+// ── Contador de días ──────────────────────────────────────────
+
+function daysLabel(fl, st) {
+  if (!fl || st === 'cerrado') return null;
+  const now  = new Date(new Date().toDateString());
+  const d    = new Date(fl + 'T00:00:00');
+  const diff = Math.round((d - now) / 86400000);
+  if (diff === 0)  return { text: 'Hoy',                   cls: 'warn' };
+  if (diff === 1)  return { text: 'Mañana',                cls: 'warn' };
+  if (diff > 1)    return { text: diff + ' días',          cls: 'ok'   };
+  if (diff === -1) return { text: 'Vencido 1d',            cls: 'venc' };
+  return               { text: 'Vencido ' + Math.abs(diff) + 'd', cls: 'venc' };
+}
+
+// ── Estatus ───────────────────────────────────────────────────
+
+const EST_LABEL = {
+  pendiente:  'Pendiente',
+  en_proceso: 'En Proceso',
+  esperando:  'Esperando',
+  cerrado:    'Cerrado',
+};
+
+const EST_COLOR = {
+  pendiente:  '#E63946',
+  en_proceso: '#F4A261',
+  esperando:  '#8B949E',
+  cerrado:    '#3FB950',
+};
+
+function estadoBadge(est) {
+  const c = EST_COLOR[est] || '#8B949E';
+  const l = EST_LABEL[est] || est;
+  return '<span class="estado-badge" style="background:' + c + '22;color:' + c + ';border:1px solid ' + c + '44">' + l + '</span>';
+}
+
+// ── Filtro ────────────────────────────────────────────────────
+
+function getFiltered() {
+  const q = S.search.trim().toLowerCase();
+  return S.pendientes.filter(function(p) {
+    var stOk;
+    if (S.fSt === 'todos') stOk = true;
+    else if (S.fSt === 'propuestas')
+      stOk = p.origen === 'propuesta' && p.aprobacionEstado === 'pendiente';
+    else stOk = p.estatus === S.fSt;
+    if (!stOk) return false;
+    if (!q)    return true;
+    return (
+      (p.descripcion || '').toLowerCase().includes(q) ||
+      (p.equipo      || '').toLowerCase().includes(q) ||
+      (p.seccion     || '').toLowerCase().includes(q) ||
+      (p.responsable || '').toLowerCase().includes(q)
+    );
+  });
+}
+
+// ── Tarjeta ───────────────────────────────────────────────────
+
+function renderCard(p) {
+  const color = EST_COLOR[p.estatus] || '#8B949E';
+  const dl    = daysLabel(p.fechaLimite, p.estatus);
+  const dlHtml = dl ? '<span class="dl ' + dl.cls + '">' + dl.text + '</span>' : '';
+  const prioIcon = { baja: '🔵', normal: '🟡', alta: '🔴' }[p.prioridad] || '🟡';
+
+  var meta = '';
+  if (p.responsable && p.responsable !== p.creadoPor)
+    meta += '<span>👤 ' + esc(p.responsable) + '</span>';
+  if (p.fechaLimite)
+    meta += '<span>📅 ' + fmtDate(p.fechaLimite) + '</span>';
+  meta += dlHtml;
+
+  var extraBadge = '';
+  if (p.origen === 'propuesta' && p.aprobacionEstado === 'pendiente')
+    extraBadge = '<span class="badge badge-proposal">Propuesta</span>';
+  else if (p.origen === 'propuesta' && p.aprobacionEstado === 'rechazado')
+    extraBadge = '<span class="badge badge-rejected">Rechazada</span>';
+
+  return '<div class="card pendiente-card" data-estado="' + p.estatus + '" onclick="openDetail(\'' + p.id + '\')">' +
+    '<div class="card-top">' +
+      (p.equipo  ? '<span class="maquina-tag">' + esc(p.equipo)  + '</span>' : '') +
+      (p.seccion ? '<span class="seccion-tag">' + esc(p.seccion) + '</span>' : '') +
+      '<span style="margin-left:auto;display:flex;gap:6px;align-items:center">' +
+        estadoBadge(p.estatus) + extraBadge +
+      '</span>' +
+      '<button class="qs-btn" onclick="openQsMenu(event,\'' + p.id + '\')" title="Cambiar estatus">⋮</button>' +
+    '</div>' +
+    '<p class="descripcion">' + esc(p.descripcion) + '</p>' +
+    '<div class="card-meta">' + prioIcon + ' ' + meta + '</div>' +
+  '</div>';
+}
+
+// ── Dashboard ─────────────────────────────────────────────────
+
+function renderDashboard() {
+  var all = S.pendientes;
+
+  document.getElementById('dash-nombre').textContent = S.user.nombre.split(' ')[0];
+  document.getElementById('dash-rol').textContent =
+    { gerente: 'Gerente', supervisor: 'Supervisor', planeador: 'Planeador' }[S.user.rol] || '';
+
+  document.getElementById('cnt-pend').textContent = all.filter(function(p){ return p.estatus === 'pendiente';  }).length;
+  document.getElementById('cnt-proc').textContent = all.filter(function(p){ return p.estatus === 'en_proceso'; }).length;
+  document.getElementById('cnt-cerr').textContent = all.filter(function(p){ return p.estatus === 'cerrado';    }).length;
+
+  var propBanner = document.getElementById('dash-propuestas');
+  if (S.user.rol === 'gerente' && S.propuestasPendientes > 0) {
+    document.getElementById('badge-prop').textContent = S.propuestasPendientes;
+    propBanner.hidden = false;
+  } else {
+    propBanner.hidden = true;
   }
+
+  var gerenteSec = document.getElementById('dash-gerente');
+  if (S.user.rol === 'gerente') {
+    gerenteSec.hidden = false;
+    document.getElementById('supervisor-chips').innerHTML =
+      CONFIG.SUPERVISORES.map(function(s) {
+        return '<button class="btn btn-ghost btn-sm" onclick="openListaPersona(\'' + s + '\')">' + s.split(' ')[0] + '</button>';
+      }).join('');
+  } else {
+    gerenteSec.hidden = true;
+  }
+
+  var recientes = all
+    .filter(function(p){ return p.estatus !== 'cerrado'; })
+    .sort(function(a,b){ return (b.fechaActualizacion||'').localeCompare(a.fechaActualizacion||''); })
+    .slice(0, 5);
+
+  document.getElementById('dash-recent').innerHTML = recientes.length
+    ? recientes.map(renderCard).join('')
+    : '<div class="empty-msg">Sin pendientes activos 🎉</div>';
 }
 
-// ── Auth ───────────────────────────────────────────────────
-function initLogin() {
-  const sel = document.getElementById('login-nombre');
-  const usuarios = [
-    'Luis Manuel Lima Díaz', 'Daniel Cervantes', 'Efrain Ruiz',
-    'Jesus Ley', 'Arol Lopez', 'Ramon Alarcon', 'Nohemi Hernández',
-  ];
-  sel.innerHTML =
-    '<option value="">— Selecciona tu nombre —</option>' +
-    usuarios.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+function renderList() {
+  var items = getFiltered();
+  document.getElementById('lista-items').innerHTML = items.length
+    ? items.map(renderCard).join('')
+    : '<div class="empty-msg">Sin resultados</div>';
 }
 
-async function handleLogin() {
-  const nombre   = document.getElementById('login-nombre').value;
-  const password = document.getElementById('login-password').value;
+function renderStats() {
+  var all = S.pendientes;
+  document.getElementById('cnt-pend').textContent = all.filter(function(p){ return p.estatus === 'pendiente';  }).length;
+  document.getElementById('cnt-proc').textContent = all.filter(function(p){ return p.estatus === 'en_proceso'; }).length;
+  document.getElementById('cnt-cerr').textContent = all.filter(function(p){ return p.estatus === 'cerrado';    }).length;
+}
 
-  if (!nombre)   { showToast('Selecciona tu nombre', 'error'); return; }
-  if (!password) { showToast('Ingresa la contraseña', 'error'); return; }
+// ── Navegación ────────────────────────────────────────────────
 
-  if (Config.API_URL === 'PEGAR_AQUI_LA_URL_DEL_APPS_SCRIPT') {
-    showToast('Configura la URL del Apps Script en app.js primero', 'error');
+function openLista(fst) {
+  S.fSt      = fst;
+  S.search   = '';
+  S.prevView = 'view-dashboard';
+
+  var titles = { todos:'Todos', pendiente:'Pendiente', en_proceso:'En Proceso',
+    esperando:'Esperando', cerrado:'Cerrado', propuestas:'Propuestas' };
+  document.getElementById('lista-title').textContent = titles[fst] || fst;
+
+  document.querySelectorAll('.filter-pill').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.f === fst);
+  });
+
+  // Reset búsqueda si estaba abierta
+  var inp = document.getElementById('search-input-lista');
+  if (inp) inp.value = '';
+  document.getElementById('search-bar-lista').classList.remove('open');
+  document.getElementById('btn-search-lista').classList.remove('active');
+
+  renderList();
+  showView('view-lista');
+}
+
+function openListaPersona(nombre) {
+  S.fSt      = 'todos';
+  S.search   = '';
+  S.prevView = 'view-dashboard';
+  document.getElementById('lista-title').textContent = nombre.split(' ')[0];
+  document.querySelectorAll('.filter-pill').forEach(function(el){ el.classList.remove('active'); });
+
+  var items = S.pendientes.filter(function(p) {
+    return p.responsable === nombre && p.estatus !== 'cerrado';
+  });
+  document.getElementById('lista-items').innerHTML = items.length
+    ? items.map(renderCard).join('')
+    : '<div class="empty-msg">Sin pendientes activos para ' + nombre.split(' ')[0] + '</div>';
+
+  showView('view-lista');
+}
+
+function setFiltro(f) {
+  S.fSt = f;
+  document.querySelectorAll('.filter-pill').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.f === f);
+  });
+  renderList();
+}
+
+function goBackFromDetalle() {
+  S.detId = null;
+  showView(S.prevView || 'view-dashboard');
+}
+
+// ── Detalle ───────────────────────────────────────────────────
+
+function openDetail(id) {
+  S.detId    = id;
+  S.prevView = (document.querySelector('.view.active') || {}).id || 'view-dashboard';
+  var p = S.pendientes.find(function(x){ return x.id === id; });
+  if (!p) return;
+
+  var isGerente = S.user.rol === 'gerente';
+  var isMine    = p.creadoPor === S.user.nombre || p.responsable === S.user.nombre;
+  var canEdit   = (isGerente || isMine) && p.estatus !== 'cerrado';
+
+  document.getElementById('btn-edit-det').style.display = canEdit ? '' : 'none';
+
+  var dl    = daysLabel(p.fechaLimite, p.estatus);
+  var prioMap = { baja: '🔵 Baja', normal: '🟡 Normal', alta: '🔴 Alta' };
+
+  var html = '<div class="detail-card">' +
+    '<div class="detail-row"><span class="detail-label">Estatus</span><span class="detail-value">' + estadoBadge(p.estatus) + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Equipo</span><span class="detail-value">' + (esc(p.equipo) || '—') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Sección</span><span class="detail-value">' + (esc(p.seccion) || '—') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Prioridad</span><span class="detail-value">' + (prioMap[p.prioridad] || '—') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Responsable</span><span class="detail-value">' + (esc(p.responsable) || '—') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Creado por</span><span class="detail-value">' + (esc(p.creadoPor) || '—') + '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Fecha límite</span><span class="detail-value">' +
+      (p.fechaLimite ? fmtDate(p.fechaLimite) : '—') +
+      (dl ? '<span class="dl ' + dl.cls + '" style="margin-left:8px">' + dl.text + '</span>' : '') +
+    '</span></div>' +
+    '<div class="detail-row"><span class="detail-label">Creación</span><span class="detail-value">' + fmtDate(p.fechaCreacion) + '</span></div>' +
+    (p.fechaCierre ? '<div class="detail-row"><span class="detail-label">Cierre</span><span class="detail-value" style="color:#3FB950">' + fmtDate(p.fechaCierre) + '</span></div>' : '') +
+    (p.aprobadoPor ? '<div class="detail-row"><span class="detail-label">Aprobado por</span><span class="detail-value">' + esc(p.aprobadoPor) + '</span></div>' : '') +
+  '</div>' +
+  '<div class="descripcion-card"><span class="detail-label">Descripción</span><p class="descripcion-text">' + esc(p.descripcion) + '</p></div>';
+
+  if (p.notas) {
+    html += '<div class="descripcion-card"><span class="detail-label">Notas adicionales</span><p class="descripcion-text">' + esc(p.notas) + '</p></div>';
+  }
+
+  if (p.notaCierre) {
+    html += '<div class="bitacora-card"><span class="detail-label">📋 Nota de cierre</span><p class="bitacora-text">' + esc(p.notaCierre) + '</p></div>';
+  }
+
+  html += '<div class="actions-section">';
+
+  // Panel aprobación (gerente)
+  if (p.origen === 'propuesta' && p.aprobacionEstado === 'pendiente' && isGerente) {
+    html += '<div class="aprobacion-panel">' +
+      '<p class="aprobacion-label">Esta propuesta espera tu aprobación.</p>' +
+      '<label>Asignar a</label>' +
+      '<select id="ap-responsable" class="form-select" style="margin-bottom:0">' +
+        CONFIG.SUPERVISORES.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('') +
+      '</select>' +
+      '<div class="aprobacion-btns">' +
+        '<button class="btn btn-danger"  onclick="decidirPropuesta(\'rechazado\')">Rechazar</button>' +
+        '<button class="btn btn-success" onclick="decidirPropuesta(\'aprobado\')">Aprobar y asignar</button>' +
+      '</div></div>';
+  }
+
+  // Botones de estatus
+  if (p.estatus !== 'cerrado' && (isGerente || isMine)) {
+    var opciones = ['pendiente', 'en_proceso', 'esperando', 'cerrado'].filter(function(e){ return e !== p.estatus; });
+    html += '<div class="estado-change-panel"><span class="detail-label">Cambiar estatus</span><div class="estado-change-btns">';
+    opciones.forEach(function(e) {
+      html += '<button class="btn btn-sm" style="background:' + EST_COLOR[e] + '22;color:' + EST_COLOR[e] + ';border:1px solid ' + EST_COLOR[e] + '44" onclick="qSt(\'' + p.id + '\',\'' + e + '\')">' + EST_LABEL[e] + '</button>';
+    });
+    html += '</div></div>';
+  }
+
+  if (p.estatus === 'cerrado' && (isGerente || isMine)) {
+    html += '<button class="btn btn-outline btn-full" onclick="qSt(\'' + p.id + '\',\'pendiente\')">↩ Reabrir pendiente</button>';
+  }
+
+  html += '</div>';
+
+  document.getElementById('det-content').innerHTML = html;
+  showView('view-detalle');
+}
+
+// ── Quick Status Menu ─────────────────────────────────────────
+
+var _qsId = null;
+
+function openQsMenu(e, id) {
+  e.stopPropagation();
+  _qsId = id;
+  var menu  = document.getElementById('qs-menu');
+  var rect  = e.currentTarget.getBoundingClientRect();
+  var menuW = 160, menuH = 200;
+  var top  = rect.bottom + 4;
+  var left = rect.right - menuW;
+  if (top + menuH > window.innerHeight - 10) top = rect.top - menuH - 4;
+  if (left < 8) left = 8;
+  menu.style.top  = top  + 'px';
+  menu.style.left = left + 'px';
+  menu.classList.add('open');
+}
+
+function qsSelect(est) {
+  document.getElementById('qs-menu').classList.remove('open');
+  if (!_qsId) return;
+  qSt(_qsId, est);
+  _qsId = null;
+}
+
+document.addEventListener('click', function() {
+  document.getElementById('qs-menu').classList.remove('open');
+});
+
+// ── Cambio de estatus ─────────────────────────────────────────
+
+async function qSt(id, est) {
+  var p = S.pendientes.find(function(x){ return x.id === id; });
+  if (!p) return;
+
+  if (est === 'cerrado' && p.estatus !== 'cerrado') {
+    openCloseModal(id);
     return;
   }
 
   showLoading(true);
   try {
-    const r = await api('login', { nombre, password });
+    var r = await api('updateEstatus', { id: id, estatus: est });
     if (r.success) {
-      State.user = r.usuario;
-      localStorage.setItem('mpm_user', JSON.stringify(State.user));
-      await loadAndShowDashboard();
+      p.estatus            = est;
+      p.fechaActualizacion = new Date().toISOString();
+      if (est !== 'cerrado') { p.fechaCierre = null; p.notaCierre = null; }
+      renderStats();
+      renderList();
+      renderDashboard();
+      if (S.detId === id) openDetail(id);
+      toast(est === 'pendiente' ? 'Reabierto' : 'Estatus actualizado', 'success');
     } else {
-      showToast(r.error || 'Acceso denegado', 'error');
+      toast('Error al actualizar', 'error');
     }
-  } catch {
-    showToast('Sin conexión. Verifica tu red.', 'error');
+  } catch(err) {
+    toast('Error de conexión', 'error');
   } finally {
     showLoading(false);
   }
 }
 
-function handleLogout() {
-  State.user = null;
-  State.pendientes = [];
+// ── Modal nota de cierre ──────────────────────────────────────
+
+var _closeId = null;
+
+function openCloseModal(id) {
+  _closeId = id;
+  document.getElementById('close-note').value = '';
+  document.getElementById('close-modal').classList.add('open');
+  setTimeout(function(){ document.getElementById('close-note').focus(); }, 100);
+}
+
+async function confirmClose() {
+  var nota = document.getElementById('close-note').value.trim() || null;
+  document.getElementById('close-modal').classList.remove('open');
+  await doClose(_closeId, nota);
+  _closeId = null;
+}
+
+async function skipClose() {
+  document.getElementById('close-modal').classList.remove('open');
+  await doClose(_closeId, null);
+  _closeId = null;
+}
+
+async function doClose(id, nota) {
+  var p = S.pendientes.find(function(x){ return x.id === id; });
+  if (!p) return;
+  showLoading(true);
+  try {
+    var r = await api('updateEstatus', { id: id, estatus: 'cerrado', notaCierre: nota || '' });
+    if (r.success) {
+      p.estatus            = 'cerrado';
+      p.fechaCierre        = today();
+      p.notaCierre         = nota;
+      p.fechaActualizacion = new Date().toISOString();
+      renderStats();
+      renderList();
+      renderDashboard();
+      if (S.detId === id) openDetail(id);
+      toast('Pendiente cerrado ✓', 'success');
+    } else {
+      toast('Error al cerrar', 'error');
+    }
+  } catch(err) {
+    toast('Error de conexión', 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ── Aprobar / rechazar propuesta ──────────────────────────────
+
+async function decidirPropuesta(decision) {
+  var p = S.pendientes.find(function(x){ return x.id === S.detId; });
+  if (!p) return;
+
+  var responsable = '';
+  if (decision === 'aprobado') {
+    var sel = document.getElementById('ap-responsable');
+    responsable = sel ? sel.value : '';
+    if (!responsable) { toast('Selecciona un responsable', 'error'); return; }
+  }
+
+  showLoading(true);
+  try {
+    var r = await api('aprobarPropuesta', {
+      id: p.id, decision: decision,
+      aprobadoPor: S.user.nombre, responsable: responsable
+    });
+    if (r.success) {
+      await loadData();
+      renderDashboard();
+      var updated = S.pendientes.find(function(x){ return x.id === S.detId; });
+      if (updated) openDetail(S.detId);
+      else showView('view-dashboard');
+      toast(decision === 'aprobado' ? 'Propuesta aprobada ✓' : 'Propuesta rechazada', 'success');
+    } else {
+      toast('Error', 'error');
+    }
+  } catch(err) {
+    toast('Error de conexión', 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ── Formulario nuevo / editar ─────────────────────────────────
+
+function openNuevo() {
+  S.editId   = null;
+  S.prevView = (document.querySelector('.view.active') || {}).id || 'view-dashboard';
+  document.getElementById('nuevo-title').textContent = 'Nuevo Pendiente';
+  document.getElementById('fg-origen').hidden         = false;
+
+  var origenSel = document.getElementById('f-origen');
+  if (S.user.rol === 'gerente') {
+    origenSel.innerHTML =
+      '<option value="asignado">📌 Asignado — directo a un supervisor</option>' +
+      '<option value="personal">👤 Personal — solo yo lo veo</option>';
+  } else {
+    origenSel.innerHTML =
+      '<option value="personal">👤 Personal — solo yo lo veo</option>' +
+      '<option value="propuesta">📋 Propuesta — espera aprobación del gerente</option>';
+  }
+
+  onOrigenChange();
+
+  document.getElementById('f-responsable').innerHTML =
+    CONFIG.SUPERVISORES.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('');
+
+  ['f-equipo','f-seccion','f-descripcion','f-notas'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-prioridad').value   = 'normal';
+  document.getElementById('f-fechaLimite').value = '';
+
+  showView('view-nuevo');
+}
+
+function openEdit() {
+  var p = S.pendientes.find(function(x){ return x.id === S.detId; });
+  if (!p) return;
+  S.editId = p.id;
+
+  document.getElementById('nuevo-title').textContent = 'Editar Pendiente';
+  document.getElementById('fg-origen').hidden         = true;
+
+  document.getElementById('f-equipo').value      = p.equipo      || '';
+  document.getElementById('f-seccion').value     = p.seccion     || '';
+  document.getElementById('f-descripcion').value = p.descripcion || '';
+  document.getElementById('f-notas').value       = p.notas       || '';
+  document.getElementById('f-prioridad').value   = p.prioridad   || 'normal';
+  document.getElementById('f-fechaLimite').value = p.fechaLimite || '';
+
+  var fgResp = document.getElementById('fg-responsable');
+  if (S.user.rol === 'gerente') {
+    fgResp.hidden = false;
+    document.getElementById('f-responsable').innerHTML =
+      CONFIG.SUPERVISORES.map(function(s) {
+        return '<option value="' + s + '"' + (p.responsable === s ? ' selected' : '') + '>' + s + '</option>';
+      }).join('');
+  } else {
+    fgResp.hidden = true;
+  }
+
+  showView('view-nuevo');
+}
+
+function cancelNuevo() {
+  S.editId = null;
+  showView(S.prevView || 'view-dashboard');
+}
+
+function onOrigenChange() {
+  var origen = document.getElementById('f-origen').value;
+  document.getElementById('fg-responsable').hidden = origen !== 'asignado';
+}
+
+async function submitNuevo() {
+  var equipo      = document.getElementById('f-equipo').value.trim();
+  var descripcion = document.getElementById('f-descripcion').value.trim();
+
+  if (!equipo)      { toast('El equipo es requerido',      'error'); return; }
+  if (!descripcion) { toast('La descripción es requerida', 'error'); return; }
+
+  var payload = {
+    equipo:      equipo,
+    seccion:     document.getElementById('f-seccion').value.trim(),
+    descripcion: descripcion,
+    prioridad:   document.getElementById('f-prioridad').value,
+    fechaLimite: document.getElementById('f-fechaLimite').value,
+    notas:       document.getElementById('f-notas').value.trim(),
+    responsable: document.getElementById('f-responsable').value || '',
+    creadoPor:   S.user.nombre,
+  };
+
+  if (S.editId) {
+    payload.id = S.editId;
+  } else {
+    payload.origen = document.getElementById('f-origen').value;
+  }
+
+  showLoading(true);
+  try {
+    var r = await api('savePendiente', payload);
+    if (r.success) {
+      var wasEdit = !!S.editId;
+      S.editId = null;
+      await loadData();
+      renderDashboard();
+      showView('view-dashboard');
+      toast(wasEdit ? 'Guardado ✓' : 'Pendiente creado ✓', 'success');
+    } else {
+      toast(r.error || 'Error al guardar', 'error');
+    }
+  } catch(err) {
+    toast('Error de conexión', 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ── Auth ──────────────────────────────────────────────────────
+
+function initLogin() {
+  var sel = document.getElementById('login-nombre');
+  sel.innerHTML = '<option value="">— Selecciona —</option>' +
+    CONFIG.USUARIOS.map(function(u){ return '<option value="' + u + '">' + u + '</option>'; }).join('');
+}
+
+async function doLogin() {
+  var nombre   = document.getElementById('login-nombre').value;
+  var password = document.getElementById('login-password').value;
+  if (!nombre)   { toast('Selecciona tu nombre',  'error'); return; }
+  if (!password) { toast('Ingresa la contraseña', 'error'); return; }
+
+  showLoading(true);
+  try {
+    var r = await api('login', { nombre: nombre, password: password });
+    if (r.success) {
+      S.user = r.usuario;
+      localStorage.setItem('mpm_user', JSON.stringify(S.user));
+      await loadData();
+      renderDashboard();
+      showView('view-dashboard');
+    } else {
+      toast(r.error || 'Credenciales incorrectas', 'error');
+    }
+  } catch(err) {
+    toast('Error de conexión. Verifica tu internet.', 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+function doLogout() {
   localStorage.removeItem('mpm_user');
+  S.user       = null;
+  S.pendientes = [];
   document.getElementById('login-password').value = '';
   showView('view-login');
 }
 
-// ── Dashboard ──────────────────────────────────────────────
-async function loadAndShowDashboard() {
-  showLoading(true);
-  try {
-    const r = await api('getPendientes', { nombre: State.user.nombre, rol: State.user.rol });
-    if (r.success) {
-      State.pendientes           = r.pendientes || [];
-      State.propuestasPendientes = r.propuestasPendientes || 0;
-    }
-  } catch {
-    showToast('Error al cargar datos', 'error');
-  } finally {
-    showLoading(false);
-  }
-  renderDashboard();
-  showView('view-dashboard');
-}
+// ── Datos ─────────────────────────────────────────────────────
 
-async function refreshPendientes() {
-  const r = await api('getPendientes', { nombre: State.user.nombre, rol: State.user.rol });
+async function loadData() {
+  var r = await api('getPendientes', { nombre: S.user.nombre, rol: S.user.rol });
   if (r.success) {
-    State.pendientes           = r.pendientes || [];
-    State.propuestasPendientes = r.propuestasPendientes || 0;
+    S.pendientes           = r.pendientes || [];
+    S.propuestasPendientes = r.propuestasPendientes || 0;
   }
 }
 
-function renderDashboard() {
-  const u = State.user;
-  const p = State.pendientes;
-
-  // Header
-  document.getElementById('dash-nombre').textContent = u.nombre.split(' ')[0];
-  document.getElementById('dash-rol').textContent =
-    u.rol === 'gerente'   ? 'Gerente de Mantenimiento'  :
-    u.rol === 'planeador' ? 'Planeador de Mantenimiento' :
-                            'Supervisor de Mantenimiento';
-
-  // Counts
-  let nPendiente, nEnProceso, nResuelto;
-  if (u.rol === 'gerente') {
-    const activos = p.filter(x => x.aprobacion_estado !== 'pendiente');
-    nPendiente = activos.filter(x => x.estado === 'pendiente').length;
-    nEnProceso = activos.filter(x => x.estado === 'en_proceso').length;
-    nResuelto  = p.filter(x => x.estado === 'resuelto').length;
-  } else {
-    const mine = p.filter(x => x.asignado_a === u.nombre && x.aprobacion_estado !== 'pendiente');
-    nPendiente = mine.filter(x => x.estado === 'pendiente').length;
-    nEnProceso = mine.filter(x => x.estado === 'en_proceso').length;
-    nResuelto  = mine.filter(x => x.estado === 'resuelto').length;
-  }
-
-  document.getElementById('count-pendiente').textContent  = nPendiente;
-  document.getElementById('count-en-proceso').textContent = nEnProceso;
-  document.getElementById('count-resuelto').textContent   = nResuelto;
-
-  // Propuestas alert
-  const bannerEl = document.getElementById('dash-propuestas-section');
-  if (u.rol === 'gerente' && State.propuestasPendientes > 0) {
-    bannerEl.hidden = false;
-    document.getElementById('badge-propuestas').textContent = State.propuestasPendientes;
-  } else {
-    bannerEl.hidden = true;
-  }
-
-  // Gerente controls
-  document.getElementById('dash-gerente-section').hidden = (u.rol !== 'gerente');
-
-  renderRecentList();
-}
-
-function renderRecentList() {
-  const u = State.user;
-  let items;
-  if (u.rol === 'gerente') {
-    items = State.pendientes
-      .filter(p => p.estado !== 'resuelto' && p.estado !== 'rechazado' && p.aprobacion_estado !== 'pendiente')
-      .sort((a, b) => new Date(b.fecha_creacion) - new Date(a.fecha_creacion))
-      .slice(0, 6);
-  } else {
-    items = State.pendientes
-      .filter(p => p.asignado_a === u.nombre && p.estado !== 'resuelto' && p.aprobacion_estado !== 'pendiente')
-      .sort((a, b) => new Date(b.fecha_creacion) - new Date(a.fecha_creacion))
-      .slice(0, 6);
-  }
-
-  const container = document.getElementById('dash-recent');
-  if (items.length === 0) {
-    container.innerHTML = '<p class="empty-msg">Sin pendientes activos 🎉</p>';
-    return;
-  }
-  container.innerHTML = items.map(renderCard).join('');
-}
-
-// ── Lista ──────────────────────────────────────────────────
-function openLista(filtroInicial = 'todos') {
-  State.filtro      = filtroInicial;
-  State.filtroPersona = '';
-  State.prevView    = 'view-lista';
-  renderLista();
-  showView('view-lista');
-}
-
-function openListaPersona(persona) {
-  State.filtro        = 'todos';
-  State.filtroPersona = persona;
-  State.prevView      = 'view-lista';
-  renderLista();
-  showView('view-lista');
-}
-
-function setFiltro(f) { State.filtro = f; renderLista(); }
-function setFiltroPersona(p) { State.filtroPersona = p; renderLista(); }
-
-function renderLista() {
-  const u = State.user;
-  let items = [...State.pendientes];
-
-  // Filters
-  if (State.filtro === 'propuestas') {
-    items = items.filter(p => p.origen === 'propuesta' && p.aprobacion_estado === 'pendiente');
-  } else if (State.filtro !== 'todos') {
-    items = items.filter(p => p.estado === State.filtro);
-    if (u.rol !== 'gerente') {
-      items = items.filter(p => !(p.origen === 'propuesta' && p.aprobacion_estado === 'pendiente'));
-    }
-  }
-
-  if (u.rol === 'gerente' && State.filtroPersona) {
-    items = items.filter(p =>
-      p.asignado_a === State.filtroPersona || p.creado_por === State.filtroPersona
-    );
-  }
-
-  // Sort: active first, then by date desc
-  const stOrder = { pendiente: 0, en_proceso: 1, resuelto: 2, rechazado: 3 };
-  items.sort((a, b) => {
-    const d = (stOrder[a.estado] ?? 4) - (stOrder[b.estado] ?? 4);
-    return d || new Date(b.fecha_creacion) - new Date(a.fecha_creacion);
-  });
-
-  // Filter pills
-  document.querySelectorAll('.filter-pill').forEach(pill => {
-    pill.classList.toggle('active', pill.dataset.filtro === State.filtro);
-  });
-
-  // Persona filter
-  const personaEl = document.getElementById('persona-filter');
-  personaEl.hidden = (u.rol !== 'gerente');
-  if (u.rol === 'gerente') {
-    document.getElementById('persona-select').value = State.filtroPersona;
-  }
-
-  // Title
-  const titles = {
-    todos: 'Todos los pendientes', pendiente: 'Pendientes',
-    en_proceso: 'En proceso', resuelto: 'Resueltos',
-    propuestas: 'Propuestas por aprobar',
-  };
-  document.getElementById('lista-title').textContent = titles[State.filtro] || 'Pendientes';
-
-  // Render
-  const container = document.getElementById('lista-items');
-  if (items.length === 0) {
-    container.innerHTML = '<p class="empty-msg">No hay registros para este filtro</p>';
-    return;
-  }
-  container.innerHTML = items.map(renderCard).join('');
-}
-
-function renderCard(pend) {
-  const estadoClass = {
-    pendiente: 'estado-pendiente', en_proceso: 'estado-proceso',
-    resuelto:  'estado-resuelto',  rechazado:  'estado-rechazado',
-  };
-
-  let extraBadge = '';
-  if (pend.origen === 'propuesta' && pend.aprobacion_estado === 'pendiente') {
-    extraBadge = '<span class="badge badge-proposal">⏳ Por aprobar</span>';
-  } else if (pend.aprobacion_estado === 'rechazado' && pend.origen === 'propuesta') {
-    extraBadge = '<span class="badge badge-rejected">✗ Rechazada</span>';
-  }
-
-  const asignadoText = pend.asignado_a
-    ? `<span>👤 ${esc(pend.asignado_a.split(' ')[0])}</span>` : '';
-
-  return `
-    <div class="card pendiente-card" data-estado="${esc(pend.estado)}"
-         onclick="openDetalle('${esc(pend.id)}')">
-      <div class="card-top">
-        <span class="maquina-tag">${esc(pend.maquina)}</span>
-        <span class="seccion-tag">${esc(pend.seccion)}</span>
-        <span class="estado-badge ${estadoClass[pend.estado] || ''}">${estadoLabel(pend.estado)}</span>
-      </div>
-      <p class="descripcion">${esc(pend.descripcion)}</p>
-      <div class="card-meta">
-        ${asignadoText}
-        <span>📅 ${formatFecha(pend.fecha_creacion)}</span>
-        ${extraBadge}
-      </div>
-    </div>`;
-}
-
-// ── Detalle ────────────────────────────────────────────────
-function openDetalle(id) {
-  const pend = State.pendientes.find(p => p.id === id);
-  if (!pend) return;
-  State.pendienteActual = pend;
-  renderDetalle(pend);
-  showView('view-detalle');
-}
-
-function goBackFromDetalle() {
-  showView(State.prevView || 'view-dashboard');
-}
-
-function renderDetalle(pend) {
-  const u         = State.user;
-  const isGerente = u.rol === 'gerente';
-  const isMiTarea = pend.asignado_a === u.nombre ||
-                    (pend.origen === 'personal' && pend.creado_por === u.nombre);
-  const isPending = pend.origen === 'propuesta' && pend.aprobacion_estado === 'pendiente';
-  const isActivo  = pend.estado !== 'resuelto' && pend.estado !== 'rechazado';
-
-  document.getElementById('det-maquina').textContent          = pend.maquina;
-  document.getElementById('det-seccion').textContent          = pend.seccion;
-  document.getElementById('det-estado').textContent           = estadoLabel(pend.estado);
-  document.getElementById('det-estado').className             = `detail-value estado-text ${pend.estado}`;
-  document.getElementById('det-origen').textContent           = origenLabel(pend.origen);
-  document.getElementById('det-asignado-a').textContent       = pend.asignado_a || '—';
-  document.getElementById('det-creado-por').textContent       = pend.creado_por;
-  document.getElementById('det-aprobado-por').textContent     = pend.aprobado_por || '—';
-  document.getElementById('det-fecha-creacion').textContent   = formatFecha(pend.fecha_creacion);
-  document.getElementById('det-fecha-resolucion').textContent = formatFecha(pend.fecha_resolucion) || '—';
-  document.getElementById('det-descripcion').textContent      = pend.descripcion;
-
-  // Bitácora
-  const bitEl = document.getElementById('det-bitacora-section');
-  if (pend.bitacora) {
-    bitEl.hidden = false;
-    document.getElementById('det-bitacora').textContent = pend.bitacora;
-  } else {
-    bitEl.hidden = true;
-  }
-
-  // Actions
-  const actEl = document.getElementById('det-actions');
-  actEl.innerHTML = '';
-
-  // Supervisor/planeador: update status of their own task
-  if (!isGerente && isMiTarea && isActivo && !isPending) {
-    if (pend.estado === 'pendiente') {
-      actEl.innerHTML += `
-        <button class="btn btn-secondary btn-full" onclick="cambiarEstado('en_proceso')">
-          ▶ Marcar En Proceso
-        </button>`;
-    }
-    actEl.innerHTML += `
-      <button class="btn btn-success btn-full" onclick="openBitacoraModal()">
-        ✓ Marcar Resuelto
-      </button>`;
-  }
-
-  // Gerente: approve / reject proposal
-  if (isGerente && isPending) {
-    actEl.innerHTML = `
-      <div class="aprobacion-panel">
-        <p class="aprobacion-label">Propuesto por: <strong>${esc(pend.creado_por)}</strong></p>
-        <label>Asignar a:</label>
-        <select id="aprobacion-asignado" class="form-select" style="margin-bottom:0">
-          ${SUPERVISORES.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}
-        </select>
-        <div class="aprobacion-btns">
-          <button class="btn btn-success" onclick="handleAprobacion('aprobado')">✓ Aprobar</button>
-          <button class="btn btn-danger"  onclick="handleAprobacion('rechazado')">✗ Rechazar</button>
-        </div>
-      </div>`;
-    const sel = document.getElementById('aprobacion-asignado');
-    if (sel && SUPERVISORES.includes(pend.creado_por)) sel.value = pend.creado_por;
-  }
-
-  // Gerente: change status of any active task
-  if (isGerente && !isPending && isActivo) {
-    actEl.innerHTML += `
-      <div class="estado-change-panel">
-        <span class="detail-label">Cambiar estado</span>
-        <div class="estado-change-btns">
-          ${pend.estado !== 'en_proceso' ? `
-            <button class="btn btn-secondary btn-sm" onclick="cambiarEstado('en_proceso')">▶ En Proceso</button>` : ''}
-          <button class="btn btn-success btn-sm" onclick="openBitacoraModal()">✓ Resuelto</button>
-        </div>
-      </div>`;
-  }
-}
-
-async function cambiarEstado(nuevoEstado) {
-  const pend = State.pendienteActual;
+async function refreshDash() {
   showLoading(true);
   try {
-    const r = await api('updateEstado', { id: pend.id, estado: nuevoEstado });
-    if (r.success) {
-      showToast('Estado actualizado', 'success');
-      await refreshPendientes();
-      State.pendienteActual = State.pendientes.find(p => p.id === pend.id);
-      if (State.pendienteActual) renderDetalle(State.pendienteActual);
-      showView('view-detalle');
-    } else {
-      showToast(r.error || 'Error al actualizar', 'error');
-    }
-  } catch {
-    showToast('Error de conexión', 'error');
+    await loadData();
+    renderDashboard();
+    toast('Datos actualizados', 'success');
+  } catch(err) {
+    toast('Error al actualizar', 'error');
   } finally {
     showLoading(false);
   }
 }
 
-function openBitacoraModal() {
-  document.getElementById('bitacora-texto').value = '';
-  document.getElementById('modal-bitacora').classList.add('visible');
-  setTimeout(() => document.getElementById('bitacora-texto').focus(), 100);
-}
+// ── Búsqueda ──────────────────────────────────────────────────
 
-function closeBitacoraModal() {
-  document.getElementById('modal-bitacora').classList.remove('visible');
-}
+function initSearch() {
+  ['dash', 'lista'].forEach(function(ctx) {
+    var btn = document.getElementById('btn-search-' + ctx);
+    var bar = document.getElementById('search-bar-' + ctx);
+    var inp = document.getElementById('search-input-' + ctx);
 
-async function submitBitacora() {
-  const texto = document.getElementById('bitacora-texto').value.trim();
-  if (!texto) {
-    showToast('Describe qué se hizo para resolver el pendiente', 'error');
-    document.getElementById('bitacora-texto').focus();
-    return;
-  }
-  closeBitacoraModal();
-
-  const pend = State.pendienteActual;
-  showLoading(true);
-  try {
-    const r = await api('updateEstado', { id: pend.id, estado: 'resuelto', bitacora: texto });
-    if (r.success) {
-      showToast('Pendiente resuelto ✓', 'success');
-      await refreshPendientes();
-      State.pendienteActual = State.pendientes.find(p => p.id === pend.id);
-      if (State.pendienteActual) renderDetalle(State.pendienteActual);
-      showView('view-detalle');
-    } else {
-      showToast(r.error || 'Error al guardar', 'error');
-    }
-  } catch {
-    showToast('Error de conexión', 'error');
-  } finally {
-    showLoading(false);
-  }
-}
-
-async function handleAprobacion(decision) {
-  const pend = State.pendienteActual;
-  let asignadoA = '';
-  if (decision === 'aprobado') {
-    asignadoA = document.getElementById('aprobacion-asignado')?.value;
-    if (!asignadoA) { showToast('Selecciona a quién asignar', 'error'); return; }
-  }
-  showLoading(true);
-  try {
-    const r = await api('aprobarPropuesta', {
-      id: pend.id, decision,
-      aprobado_por: State.user.nombre,
-      asignado_a:   asignadoA,
+    btn.addEventListener('click', function() {
+      var isOpen = bar.classList.toggle('open');
+      btn.classList.toggle('active', isOpen);
+      if (isOpen) {
+        S.search = '';
+        setTimeout(function(){ inp.focus(); }, 260);
+      } else {
+        inp.value = '';
+        S.search  = '';
+        if (ctx === 'lista') renderList();
+      }
     });
-    if (r.success) {
-      const msg = decision === 'aprobado'
-        ? `Propuesta aprobada → asignada a ${asignadoA.split(' ')[0]}`
-        : 'Propuesta rechazada';
-      showToast(msg, 'success');
-      await refreshPendientes();
-      renderDashboard();
-      showView('view-dashboard');
-    } else {
-      showToast(r.error || 'Error', 'error');
-    }
-  } catch {
-    showToast('Error de conexión', 'error');
-  } finally {
-    showLoading(false);
-  }
-}
 
-// ── Nuevo pendiente ────────────────────────────────────────
-async function openNuevo() {
-  showLoading(true);
-  try {
-    const r = await api('getCatalogo');
-    if (r.success) State.catalogo = r;
-  } catch {
-    showToast('Error cargando catálogo', 'error');
-  } finally {
-    showLoading(false);
-  }
-  renderNuevoForm();
-  showView('view-nuevo');
-}
-
-function renderNuevoForm() {
-  const isGerente = State.user.rol === 'gerente';
-
-  document.getElementById('nuevo-origen').innerHTML = isGerente
-    ? `<option value="asignado">Asignar a supervisor / planeador</option>
-       <option value="personal">Personal (solo yo lo veo)</option>`
-    : `<option value="personal">Personal (solo yo lo veo)</option>
-       <option value="propuesta">Proponer al gerente</option>`;
-
-  populateSelect('nuevo-maquina', State.catalogo.maquinas, '— Selecciona máquina —', true);
-  populateSelect('nuevo-seccion', State.catalogo.secciones, '— Selecciona sección —', true);
-  updateAsignadoField();
-  document.getElementById('nuevo-descripcion').value = '';
-}
-
-function populateSelect(id, items, placeholder, withNew = false) {
-  const sel = document.getElementById(id);
-  sel.innerHTML =
-    `<option value="">${placeholder}</option>` +
-    (items || []).map(i => `<option value="${esc(i)}">${esc(i)}</option>`).join('');
-  if (withNew) sel.innerHTML += `<option value="__nuevo__">+ Agregar nueva...</option>`;
-}
-
-function updateAsignadoField() {
-  const origen    = document.getElementById('nuevo-origen').value;
-  const asigSec   = document.getElementById('nuevo-asignado-section');
-  const isGerente = State.user.rol === 'gerente';
-
-  if (isGerente && origen === 'asignado') {
-    asigSec.hidden = false;
-    populateSelect('nuevo-asignado', SUPERVISORES, '— Seleccionar persona —');
-  } else {
-    asigSec.hidden = true;
-  }
-}
-
-function handleCatalogoChange(selectId, tipo) {
-  const sel = document.getElementById(selectId);
-  if (sel.value !== '__nuevo__') return;
-  const label = tipo === 'maquina' ? 'máquina / equipo' : 'sección / módulo';
-  const valor = prompt(`Nombre del nuevo ${label}:`);
-  if (!valor || !valor.trim()) { sel.value = ''; return; }
-  agregarCatalogo(tipo, valor.trim(), sel);
-}
-
-async function agregarCatalogo(tipo, valor, selectEl) {
-  showLoading(true);
-  try {
-    const r = await api('addCatalogo', { tipo, valor });
-    if (r.success) {
-      if (tipo === 'maquina') State.catalogo.maquinas.push(valor);
-      else                    State.catalogo.secciones.push(valor);
-      const opt    = document.createElement('option');
-      opt.value    = valor; opt.textContent = valor;
-      const newRef = selectEl.querySelector('option[value="__nuevo__"]');
-      selectEl.insertBefore(opt, newRef);
-      selectEl.value = valor;
-      showToast(`${tipo === 'maquina' ? 'Máquina' : 'Sección'} "${valor}" agregada`, 'success');
-    }
-  } catch {
-    showToast('Error al agregar', 'error');
-    selectEl.value = '';
-  } finally {
-    showLoading(false);
-  }
-}
-
-async function submitNuevo() {
-  const origen      = document.getElementById('nuevo-origen').value;
-  const maquina     = document.getElementById('nuevo-maquina').value;
-  const seccion     = document.getElementById('nuevo-seccion').value;
-  const descripcion = document.getElementById('nuevo-descripcion').value.trim();
-  const asignado_a  = document.getElementById('nuevo-asignado')?.value || '';
-
-  if (!maquina || maquina === '__nuevo__') { showToast('Selecciona una máquina', 'error'); return; }
-  if (!seccion || seccion === '__nuevo__') { showToast('Selecciona una sección', 'error'); return; }
-  if (!descripcion) {
-    document.getElementById('nuevo-descripcion').focus();
-    showToast('Escribe la descripción del pendiente', 'error');
-    return;
-  }
-  if (State.user.rol === 'gerente' && origen === 'asignado' && !asignado_a) {
-    showToast('Selecciona a quién asignar', 'error'); return;
-  }
-
-  showLoading(true);
-  try {
-    const r = await api('createPendiente', {
-      origen, maquina, seccion, descripcion, asignado_a,
-      creado_por: State.user.nombre,
+    inp.addEventListener('input', function(e) {
+      S.search = e.target.value;
+      if (ctx === 'lista') renderList();
     });
-    if (r.success) {
-      const msg = {
-        propuesta: 'Propuesta enviada al gerente',
-        asignado:  `Pendiente asignado a ${asignado_a.split(' ')[0]}`,
-        personal:  'Pendiente personal creado',
-      }[origen] || 'Guardado';
-      showToast(msg, 'success');
-      await refreshPendientes();
-      renderDashboard();
-      showView('view-dashboard');
-    } else {
-      showToast(r.error || 'Error al crear', 'error');
-    }
-  } catch {
-    showToast('Error de conexión', 'error');
-  } finally {
-    showLoading(false);
-  }
+  });
 }
 
-// ── Init ───────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────
+
 async function init() {
-  const saved = localStorage.getItem('mpm_user');
+  initLogin();
+  initSearch();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'SW_UPDATED') window.location.reload();
+    });
+  }
+
+  var saved = localStorage.getItem('mpm_user');
   if (saved) {
     try {
-      State.user = JSON.parse(saved);
-      await loadAndShowDashboard();
-      return;
-    } catch {
+      S.user = JSON.parse(saved);
+      showLoading(true);
+      await loadData();
+      renderDashboard();
+      showView('view-dashboard');
+    } catch(err) {
       localStorage.removeItem('mpm_user');
+      showView('view-login');
+    } finally {
+      showLoading(false);
     }
+  } else {
+    showView('view-login');
   }
-  initLogin();
-  showView('view-login');
 }
 
-document.addEventListener('DOMContentLoaded', init);
-
-// Service worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
-}
+init();
