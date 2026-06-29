@@ -1,8 +1,8 @@
-const CACHE = 'mpm-v14';
+const CACHE = 'mpm-v15';
 const ASSETS = [
   './index.html',
   './styles.css?v=14',
-  './app.js?v=14',
+  './app.js?v=15',
   './manifest.json',
   './icon.svg',
 ];

@@ -77,11 +77,48 @@ function showLoading(show) {
 }
 
 async function api(action, params) {
-  const r = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    body: JSON.stringify(Object.assign({ action }, params || {})),
-  });
-  return r.json();
+  const body = JSON.stringify(Object.assign({ action }, params || {}));
+  let r;
+  try {
+    r = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body,
+      redirect: 'follow',
+    });
+  } catch (netErr) {
+    console.error('[API] fetch error:', netErr);
+    throw netErr;
+  }
+
+  // Si el redirect convirtió POST en GET, Apps Script devuelve el status ping
+  // en lugar de ejecutar doPost. Detectamos eso aquí.
+  const text = await r.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch (_) {
+    console.error('[API] respuesta no-JSON:', text);
+    throw new Error('Respuesta inesperada del servidor');
+  }
+
+  if (json.status && !json.success && !json.error) {
+    // Redirect convirtió POST → GET; reintentar con XMLHttpRequest (no sigue redirects)
+    console.warn('[API] POST→GET redirect detectado, reintentando con XHR…');
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', CONFIG.API_URL, true);
+      xhr.setRequestHeader('Content-Type', 'text/plain;charset=UTF-8');
+      xhr.onload = () => {
+        try { resolve(JSON.parse(xhr.responseText)); }
+        catch (_) { reject(new Error('Respuesta XHR no válida')); }
+      };
+      xhr.onerror = () => reject(new Error('Error de red (XHR)'));
+      xhr.send(body);
+    });
+  }
+
+  return json;
 }
 
 // ── Vistas ───────────────────────────────────────────────────
