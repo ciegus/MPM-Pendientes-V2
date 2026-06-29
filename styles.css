@@ -178,11 +178,11 @@ html,body{height:100%;font-family:Arial,sans-serif;background:var(--bg);color:va
 /* ── FORMULARIO ── */
 .fg{margin-bottom:16px}
 .fg label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
-#pform input[type=text],#pform input[type=date],#pform textarea,#pform select,
-.login-wrap input,#pform input{width:100%;background:var(--surf2);border:1.5px solid var(--border);color:var(--text);padding:12px 14px;border-radius:var(--rs);font-size:15px;font-family:Arial,sans-serif;transition:border-color var(--tr);-webkit-appearance:none;appearance:none}
-#pform input:focus,#pform textarea:focus,#pform select:focus{outline:none;border-color:var(--red)}
-#pform textarea{resize:none;min-height:72px;line-height:1.5}
-#pform select option{background:var(--surf2)}
+.sbody input[type=text],.sbody input[type=date],.sbody textarea,.sbody select,
+.login-wrap input,.login-wrap select{width:100%;background:var(--surf2);border:1.5px solid var(--border);color:var(--text);padding:12px 14px;border-radius:var(--rs);font-size:15px;font-family:Arial,sans-serif;transition:border-color var(--tr);-webkit-appearance:none;appearance:none}
+.sbody input:focus,.sbody textarea:focus,.sbody select:focus{outline:none;border-color:var(--red)}
+.sbody textarea{resize:none;min-height:72px;line-height:1.5}
+.sbody select option,.login-wrap select option{background:var(--surf2)}
 input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.4}
 
 /* ── SELROW (toggle botones prioridad) ── */
