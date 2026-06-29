@@ -1,295 +1,216 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0D1117">
-  <meta name="mobile-web-app-capable" content="yes">
-  <title>MPM Pendientes</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="styles.css?v=11">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#E63946">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MPM">
+<title>MPM — Pendientes</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.svg">
+<link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 
-<!-- ── Loading overlay ── -->
+<!-- LOADING -->
 <div id="loading-overlay"><div class="spinner"></div></div>
 
-<!-- ── Toast ── -->
+<!-- TOAST -->
 <div id="toast"></div>
 
-<!-- ── Quick Status Menu ── -->
+<!-- QUICK STATUS MENU -->
 <div id="qs-menu" class="qs-menu">
-  <div class="qs-item" onclick="qsSelect('pendiente')">
-    <span class="qs-dot" style="background:#E63946"></span>Pendiente
-  </div>
-  <div class="qs-item" onclick="qsSelect('en_proceso')">
-    <span class="qs-dot" style="background:#F4A261"></span>En Proceso
-  </div>
-  <div class="qs-item" onclick="qsSelect('esperando')">
-    <span class="qs-dot" style="background:#8B949E"></span>Esperando
-  </div>
-  <div class="qs-item" onclick="qsSelect('cerrado')">
-    <span class="qs-dot" style="background:#3FB950"></span>Cerrado
-  </div>
+  <div class="qs-item" onclick="qsSelect('pendiente')"><span class="qs-dot" style="background:#E63946"></span>Pendiente</div>
+  <div class="qs-item" onclick="qsSelect('en_proceso')"><span class="qs-dot" style="background:#F4A261"></span>En Proceso</div>
+  <div class="qs-item" onclick="qsSelect('esperando')"><span class="qs-dot" style="background:#8B949E"></span>Esperando</div>
+  <div class="qs-item" onclick="qsSelect('cerrado')"><span class="qs-dot" style="background:#3FB950"></span>Cerrado</div>
 </div>
 
-<!-- ── Modal: Nota de cierre ── -->
+<!-- MODAL: NOTA DE CIERRE -->
 <div id="close-modal" class="cm-wrap">
-  <div class="cm-card">
-    <h3 class="cm-title">¿Qué se hizo?</h3>
-    <p class="cm-sub">Nota de cierre opcional — queda visible para el gerente.</p>
-    <textarea id="close-note" class="form-textarea" rows="4"
-      placeholder="Ej: Se reemplazó rodamiento 6205 2RS. Máquina operando normal."></textarea>
-    <div class="cm-actions">
-      <button class="btn btn-ghost" onclick="skipClose()">Sin nota</button>
-      <button class="btn btn-success" onclick="confirmClose()">Guardar y cerrar</button>
+  <div class="cm-box">
+    <h3>✓ Cerrar pendiente</h3>
+    <p>Nota de cierre opcional — queda visible para el gerente.</p>
+    <textarea id="close-note" placeholder="Ej: Se reemplazó rodamiento 6205 2RS. Máquina operando normal."></textarea>
+    <div class="cm-btns">
+      <button class="cm-confirm" onclick="confirmClose()">Guardar y cerrar</button>
+      <button class="cm-skip" onclick="skipClose()">Sin nota</button>
     </div>
   </div>
 </div>
 
-<!-- ================================================================ -->
-<!-- VIEW: LOGIN                                                       -->
-<!-- ================================================================ -->
+<!-- ============================================================ -->
+<!-- VIEW: LOGIN                                                   -->
+<!-- ============================================================ -->
 <div id="view-login" class="view active">
   <div class="login-wrap">
-    <div class="login-logo">
-      <img src="icon.svg" alt="MPM" width="72" height="72">
-    </div>
+    <svg class="login-icon" width="64" height="64" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="16" fill="#E63946"/>
+      <text x="32" y="45" text-anchor="middle" font-size="34" fill="white" font-family="Arial" font-weight="800">M</text>
+    </svg>
     <h1 class="login-title">MPM Pendientes</h1>
     <p class="login-sub">Titan Empaques · Mega Planta Mexicali</p>
-
-    <div class="form-group">
-      <label class="form-label">Tu nombre</label>
-      <select id="login-nombre" class="form-select">
-        <option value="">— Selecciona —</option>
-      </select>
+    <div class="fg">
+      <label>Tu nombre</label>
+      <select id="login-nombre"><option value="">— Selecciona —</option></select>
     </div>
-
-    <div class="form-group">
-      <label class="form-label">Contraseña</label>
-      <input type="password" id="login-password" class="form-input"
-        placeholder="Contraseña"
+    <div class="fg">
+      <label>Contraseña</label>
+      <input type="password" id="login-password" placeholder="Contraseña"
         onkeydown="if(event.key==='Enter') doLogin()">
     </div>
-
-    <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar</button>
+    <button class="btn btn-p" style="width:100%;margin-top:4px" onclick="doLogin()">Entrar</button>
     <p class="login-footer">Mantenimiento es el activo silencioso que protege la rentabilidad.</p>
   </div>
 </div>
 
-<!-- ================================================================ -->
-<!-- VIEW: DASHBOARD                                                   -->
-<!-- ================================================================ -->
-<div id="view-dashboard" class="view">
-  <header class="app-header">
-    <div class="header-left">
-      <span class="header-greeting">Hola, <strong id="dash-nombre">—</strong></span>
-      <span class="header-rol" id="dash-rol"></span>
-    </div>
-    <div class="header-actions">
-      <button class="btn-icon" id="btn-search-dash" title="Buscar">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-      </button>
-      <button class="btn-icon" onclick="refreshDash()" title="Actualizar">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"/>
-          <polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-      </button>
-      <button class="btn-icon" onclick="doLogout()" title="Cerrar sesión">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-          <polyline points="16 17 21 12 16 7"/>
-          <line x1="21" y1="12" x2="9" y2="12"/>
-        </svg>
-      </button>
-    </div>
-  </header>
+<!-- ============================================================ -->
+<!-- VIEW: MAIN                                                    -->
+<!-- ============================================================ -->
+<div id="view-main" class="view">
 
-  <div id="search-bar-dash" class="search-bar">
-    <input id="search-input-dash" class="search-input" type="search"
-      placeholder="Buscar por descripción, equipo, sección…">
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-title">
+      <h1>MPM Pendientes</h1>
+      <div class="sub" id="subtitle">Cargando...</div>
+    </div>
+    <button class="ibtn" id="btn-search" title="Buscar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+    <button class="ibtn" onclick="refreshMain()" title="Actualizar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    </button>
+    <button class="ibtn" id="btn-settings" title="Mi cuenta">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </button>
   </div>
 
-  <main class="view-content">
-    <!-- Propuestas alert (gerente) -->
-    <div id="dash-propuestas" class="alert-banner" hidden>
-      <span>⚠️ <strong id="badge-prop">0</strong> propuesta(s) esperan aprobación</span>
-      <button class="btn btn-sm" onclick="openLista('propuestas')"
-        style="background:#F4A261;color:#0D1117;flex-shrink:0;margin-left:auto">Ver</button>
-    </div>
-
-    <!-- Stats -->
-    <div class="stats-grid">
-      <div class="stat-card stat-pendiente" onclick="openLista('pendiente')">
-        <span class="stat-num" id="cnt-pend">—</span>
-        <span class="stat-label">Pendiente</span>
+  <!-- SEARCH BAR -->
+  <div class="search-bar" id="search-bar">
+    <div class="search-inner">
+      <div class="search-wrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search-input" placeholder="Buscar descripción, equipo, sección, responsable...">
       </div>
-      <div class="stat-card stat-proceso" onclick="openLista('en_proceso')">
-        <span class="stat-num" id="cnt-proc">—</span>
-        <span class="stat-label">En Proceso</span>
-      </div>
-      <div class="stat-card stat-resuelto" onclick="openLista('cerrado')">
-        <span class="stat-num" id="cnt-cerr">—</span>
-        <span class="stat-label">Cerrados</span>
-      </div>
-    </div>
-
-    <!-- Actions -->
-    <div class="actions-row">
-      <button class="btn btn-outline" onclick="openLista('todos')">📋 Ver todo</button>
-      <button class="btn btn-primary" onclick="openNuevo()">+ Nuevo</button>
-    </div>
-
-    <!-- Gerente: por supervisor -->
-    <div id="dash-gerente" hidden>
-      <div class="section-title">Ver por supervisor</div>
-      <div class="supervisor-chips" id="supervisor-chips"></div>
-    </div>
-
-    <!-- Recientes -->
-    <div class="section-title">Activos recientes</div>
-    <div id="dash-recent"></div>
-  </main>
-</div>
-
-<!-- ================================================================ -->
-<!-- VIEW: LISTA                                                       -->
-<!-- ================================================================ -->
-<div id="view-lista" class="view">
-  <header class="app-header">
-    <button class="btn-icon" onclick="showView('view-dashboard')">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </button>
-    <h2 class="header-title" id="lista-title">Pendientes</h2>
-    <button class="btn-icon" id="btn-search-lista" title="Buscar">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-    </button>
-    <button class="btn-icon" onclick="openNuevo()" title="Nuevo">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-    </button>
-  </header>
-
-  <div id="search-bar-lista" class="search-bar">
-    <input id="search-input-lista" class="search-input" type="search" placeholder="Buscar…">
-  </div>
-
-  <div class="filter-bar">
-    <div class="filter-pills">
-      <button class="filter-pill active" data-f="todos"      onclick="setFiltro('todos')">Todos</button>
-      <button class="filter-pill"        data-f="pendiente"  onclick="setFiltro('pendiente')">Pendiente</button>
-      <button class="filter-pill"        data-f="en_proceso" onclick="setFiltro('en_proceso')">En Proceso</button>
-      <button class="filter-pill"        data-f="esperando"  onclick="setFiltro('esperando')">Esperando</button>
-      <button class="filter-pill"        data-f="cerrado"    onclick="setFiltro('cerrado')">Cerrado</button>
-      <button class="filter-pill"        data-f="propuestas" onclick="setFiltro('propuestas')">Propuestas</button>
     </div>
   </div>
 
-  <main class="view-content">
-    <div id="lista-items"></div>
-  </main>
+  <!-- STATS BAR -->
+  <div class="stats" id="stats-bar"></div>
+
+  <!-- FILTER BAR -->
+  <div class="fbar">
+    <div class="fscroll" id="eq-filters"></div>
+    <div class="sfilters" id="st-filters"></div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="content"></div>
+
+  <!-- FAB -->
+  <button class="fab" id="btn-add">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
 </div>
 
-<!-- ================================================================ -->
-<!-- VIEW: DETALLE                                                     -->
-<!-- ================================================================ -->
-<div id="view-detalle" class="view">
-  <header class="app-header">
-    <button class="btn-icon" onclick="goBackFromDetalle()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </button>
-    <h2 class="header-title">Detalle</h2>
-    <button class="btn-icon" id="btn-edit-det" style="display:none" onclick="openEdit()" title="Editar">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-      </svg>
-    </button>
-  </header>
-  <main class="view-content" id="det-content"></main>
-</div>
-
-<!-- ================================================================ -->
-<!-- VIEW: NUEVO / EDITAR                                              -->
-<!-- ================================================================ -->
-<div id="view-nuevo" class="view">
-  <header class="app-header">
-    <button class="btn-icon" onclick="cancelNuevo()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </button>
-    <h2 class="header-title" id="nuevo-title">Nuevo Pendiente</h2>
-    <div style="width:40px"></div>
-  </header>
-
-  <main class="view-content">
-    <div class="form-card">
-
-      <div class="form-group" id="fg-origen">
-        <label class="form-label">Tipo de pendiente</label>
-        <select id="f-origen" class="form-select" onchange="onOrigenChange()"></select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Equipo / Máquina *</label>
-        <input id="f-equipo" class="form-input" type="text"
-          placeholder="Ej: BHS, BOBST 924, Montacargas 1, Compresor…">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Sección / Módulo</label>
-        <input id="f-seccion" class="form-input" type="text"
-          placeholder="Ej: RSM, Eléctrico, Hidráulico, General…">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Descripción *</label>
-        <textarea id="f-descripcion" class="form-textarea" rows="4"
-          placeholder="Describe qué hay que hacer, síntomas observados, urgencia…"></textarea>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Prioridad</label>
-        <select id="f-prioridad" class="form-select">
-          <option value="baja">🔵 Baja</option>
-          <option value="normal" selected>🟡 Normal</option>
-          <option value="alta">🔴 Alta</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Fecha límite</label>
-        <input id="f-fechaLimite" class="form-input" type="date">
-      </div>
-
-      <div class="form-group" id="fg-responsable" hidden>
-        <label class="form-label">Asignar a</label>
-        <select id="f-responsable" class="form-select"></select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Notas adicionales</label>
-        <textarea id="f-notas" class="form-textarea" rows="2"
-          placeholder="Información extra, referencias, herramientas necesarias…"></textarea>
-      </div>
-
-      <button class="btn btn-primary btn-full" onclick="submitNuevo()">Guardar</button>
+<!-- ============================================================ -->
+<!-- OVERLAY: FORMULARIO (BOTTOM SHEET)                           -->
+<!-- ============================================================ -->
+<div class="ov-wrap" id="form-ov">
+  <div class="ov-bg" id="form-bg"></div>
+  <div class="bsheet">
+    <div class="shandle"></div>
+    <div class="shdr">
+      <span class="stitle" id="form-title">Nuevo Pendiente</span>
+      <button class="ibtn" id="form-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
-  </main>
+    <div class="sbody">
+      <form id="pform" autocomplete="off">
+        <div class="fg" id="fg-origen">
+          <label>Tipo de pendiente</label>
+          <select id="f-origen" onchange="onOrigenChange()"></select>
+        </div>
+        <div class="fg">
+          <label>Equipo / Máquina *</label>
+          <input type="text" id="f-equipo" list="eq-datalist"
+            placeholder="Ej: BHS, BOBST 924, Compresor…" oninput="updateSecDatalist()">
+          <datalist id="eq-datalist"></datalist>
+        </div>
+        <div class="fg">
+          <label>Sección / Módulo</label>
+          <input type="text" id="f-seccion" list="sec-datalist"
+            placeholder="Ej: RSM, Eléctrico, Hidráulico…">
+          <datalist id="sec-datalist"></datalist>
+        </div>
+        <div class="fg">
+          <label>Descripción *</label>
+          <textarea id="f-descripcion" rows="3" placeholder="Describe el pendiente de mantenimiento..."></textarea>
+        </div>
+        <div class="fg">
+          <label>Prioridad</label>
+          <div class="selrow" id="sel-prio">
+            <div class="sopt" data-f="prio" data-v="alta">⛔ Alta</div>
+            <div class="sopt on" data-f="prio" data-v="normal">⚠️ Normal</div>
+            <div class="sopt" data-f="prio" data-v="baja">✅ Baja</div>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Fecha Límite</label>
+          <input type="date" id="f-fechaLimite">
+        </div>
+        <div class="fg" id="fg-responsable">
+          <label>Asignar a</label>
+          <select id="f-responsable"></select>
+        </div>
+        <div class="fg">
+          <label>Notas</label>
+          <textarea id="f-notas" rows="2" placeholder="Observaciones, materiales, referencias..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-p" style="width:100%">Guardar</button>
+        <button type="button" class="btn btn-s" id="form-cancel" style="width:100%;margin-top:8px">Cancelar</button>
+      </form>
+    </div>
+  </div>
 </div>
 
-<script src="app.js?v=11"></script>
+<!-- ============================================================ -->
+<!-- OVERLAY: DETALLE (FULLSCREEN PANEL)                          -->
+<!-- ============================================================ -->
+<div class="ov-wrap" id="det-ov">
+  <div class="fspanel">
+    <div class="phdr">
+      <button class="ibtn" id="det-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="phdr-title">Detalle</span>
+      <button class="ibtn" id="det-edit" style="display:none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+    </div>
+    <div class="pcontent" id="det-content"></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- OVERLAY: AJUSTES / MI CUENTA (FULLSCREEN PANEL)             -->
+<!-- ============================================================ -->
+<div class="ov-wrap" id="set-ov">
+  <div class="fspanel">
+    <div class="phdr">
+      <button class="ibtn" id="set-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="phdr-title">Mi Cuenta</span>
+    </div>
+    <div class="pcontent" id="set-content"></div>
+  </div>
+</div>
+
+<script src="app.js?v=12"></script>
 </body>
 </html>
