@@ -1,9 +1,10 @@
-const CACHE = 'mpm-v13';
+const CACHE = 'mpm-v14';
 const ASSETS = [
   './index.html',
-  './styles.css?v=12',
-  './app.js?v=12',
+  './styles.css?v=14',
+  './app.js?v=14',
   './manifest.json',
+  './icon.svg',
 ];
 
 self.addEventListener('install', e => {

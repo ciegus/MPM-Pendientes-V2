@@ -10,7 +10,7 @@
 <title>MPM — Pendientes</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.svg">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
 
@@ -46,10 +46,14 @@
 <!-- ============================================================ -->
 <div id="view-login" class="view active">
   <div class="login-wrap">
-    <svg class="login-icon" width="64" height="64" viewBox="0 0 64 64">
-      <rect width="64" height="64" rx="16" fill="#E63946"/>
-      <text x="32" y="45" text-anchor="middle" font-size="34" fill="white" font-family="Arial" font-weight="800">M</text>
-    </svg>
+    <div class="login-icon-wrap">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <rect x="2" y="2" width="13" height="13" rx="3" fill="#E63946"/>
+        <rect x="21" y="2" width="13" height="13" rx="3" fill="#E63946" opacity=".6"/>
+        <rect x="2" y="21" width="13" height="13" rx="3" fill="#E63946" opacity=".6"/>
+        <rect x="21" y="21" width="13" height="13" rx="3" fill="#E63946" opacity=".3"/>
+      </svg>
+    </div>
     <h1 class="login-title">MPM Pendientes</h1>
     <p class="login-sub">Titan Empaques · Mega Planta Mexicali</p>
     <div class="fg">
@@ -61,7 +65,7 @@
       <input type="password" id="login-password" placeholder="Contraseña"
         onkeydown="if(event.key==='Enter') doLogin()">
     </div>
-    <button class="btn btn-p" style="width:100%;margin-top:4px" onclick="doLogin()">Entrar</button>
+    <button class="btn btn-login" style="width:100%;margin-top:4px" onclick="doLogin()">Entrar</button>
     <p class="login-footer">Mantenimiento es el activo silencioso que protege la rentabilidad.</p>
   </div>
 </div>
@@ -97,6 +101,9 @@
       </div>
     </div>
   </div>
+
+  <!-- BANNER PROPUESTAS -->
+  <div id="prop-banner" class="prop-banner-main" style="display:none"></div>
 
   <!-- STATS BAR -->
   <div class="stats" id="stats-bar"></div>
@@ -211,6 +218,6 @@
   </div>
 </div>
 
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

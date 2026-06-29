@@ -128,8 +128,22 @@ function renderStats() {
 
   const srch = S.search.trim() ? ` · "${S.search.trim()}"` : '';
   const eqLbl = S.fEq !== 'todos' ? ` · ${S.fEq}` : '';
+  const rolLabel = { gerente: 'Gerente', supervisor: 'Supervisor', planeador: 'Planeador' };
+  const userShort = S.user ? `${S.user.nombre.split(' ')[0]} (${rolLabel[S.user.rol] || S.user.rol})` : '';
   document.getElementById('subtitle').textContent =
-    `${vis.length} pendiente${vis.length !== 1 ? 's' : ''}${eqLbl}${srch}`;
+    `${vis.length} pendiente${vis.length !== 1 ? 's' : ''} · ${userShort}${eqLbl}${srch}`;
+
+  // Banner propuestas
+  const banner = document.getElementById('prop-banner');
+  if (banner) {
+    if (S.user && S.user.rol === 'gerente' && S.propuestasPendientes > 0) {
+      const n = S.propuestasPendientes;
+      banner.innerHTML = `⚠️ <strong>${n}</strong> propuesta${n > 1 ? 's' : ''} esperan aprobación <button class="ver-btn" onclick="event.stopPropagation();filtrarPropuestas()">Ver</button>`;
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
 
   let html =
     `<div class="stat"><div class="stat-n">${all.length}</div><div class="stat-l">Total</div></div>` +
@@ -138,9 +152,6 @@ function renderStats() {
     `<div class="stat"><div class="stat-n">${esp}</div><div class="stat-l">Esperando</div></div>` +
     (venc ? `<div class="stat venc"><div class="stat-n">${venc}</div><div class="stat-l">Vencidos</div></div>` : '');
 
-  if (S.user && S.user.rol === 'gerente' && S.propuestasPendientes > 0) {
-    html += `<div class="stat prop"><div class="stat-n">${S.propuestasPendientes}</div><div class="stat-l">Propuestas</div></div>`;
-  }
 
   document.getElementById('stats-bar').innerHTML = html;
 }
@@ -279,6 +290,7 @@ function renderContent() {
   );
 }
 
+function filtrarPropuestas() { S.fSt = 'propuestas'; renderAll(); }
 function renderAll() { renderStats(); renderFilters(); renderContent(); }
 
 // ── Quick Status Menu ─────────────────────────────────────────
