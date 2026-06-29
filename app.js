@@ -4,7 +4,7 @@
 // ================================================================
 
 const CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbyM1OOQ9eHZgfdugEBSkmeoQhOwPE0vQehsZvmNaNan33Fs6SPnAPRTBBFBI0eDB2qi/exec',
+  API_URL: 'https://script.google.com/macros/s/AKfycbw_zid86-qD6WqF7c2dX3JxaFLZAN-hTKHfS_7uNSyOg3oHgxLBCCdJPDgDQXWd2G2LoQ/exec',
   USUARIOS: [
     'Luis Manuel Lima Díaz', 'Daniel Cervantes', 'Efrain Ruiz',
     'Jesus Ley', 'Arol Lopez', 'Ramon Alarcon', 'Nohemi Hernández'
